@@ -1,11 +1,11 @@
-;;; consult-cljdoc.el --- Interactively browse cljdoc.org -  -*- lexical-binding: t; -*-
+;;; consult-cljdoc.el --- Interactively browse cljdoc.org. -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2021 Nils Grunwald <github.com/nilsgrunwald>
+;; Copyright (C) 2021 Nils Grunwald <github.com/ngrunwald>
 ;; Author: Nils Grunwald
-;; URL: http://github.com/nilsgrunwald/consult-cljdoc.el
+;; URL: https://github.com/ngrunwald/consult-cljdoc
 ;; Created: 2021
 ;; Version: 0.1.0
-;; Keywords: clojure clojurescript cljdoc documentation
+;; Keywords: clojure, clojurescript, cljdoc, documentation
 ;; Package-Requires: ((request "20210214.37") (consult "20210301.1307"))
 
 ;; This file is NOT part of GNU Emacs.
@@ -86,7 +86,7 @@
 
 (defun consult-cljdoc-marginalia-annotate (cand)
   (marginalia--fields
-   ((get-text-property 0 'description cand) :face )))
+   ((get-text-property 0 'description cand))))
 
 (add-to-list 'marginalia-annotators-heavy
              '(cljdoc-artifact . consult-cljdoc-marginalia-annotate))
