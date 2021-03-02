@@ -35,12 +35,15 @@
 (require 's)
 (require 'parseedn)
 (require 'subr-x)
+(require 'cl-macs)
 
 (defgroup consult-cljdoc nil
   "Easy interactive queries to cljdoc.org."
   :prefix "consult-cljdoc-")
 
 (defconst consult-cljdoc-version "0.1.0")
+
+(defvar consult-cljdoc-history nil)
 
 (defun consult-cljdoc--parse-item (item)
   (let ((group-id (cdr (assoc 'group-id item)))
@@ -94,24 +97,33 @@
 (add-to-list 'marginalia-annotators-heavy
              '(cljdoc-artifact . consult-cljdoc-marginalia-annotate))
 
+(defun consult-cljdoc--parse-deps-map (deps)
+  (let ((results '()))
+    (maphash (lambda (k v)
+               (let* ((parsed-art (s-split "/" (symbol-name k) t))
+                      (group-id (car parsed-art))
+                      (artifact-id (car (cdr parsed-art)))
+                      (version (gethash :mvn/version v)))
+                 (when (and group-id artifact-id version)
+                   (push `((group-id    . ,group-id)
+                           (artifact-id . ,artifact-id)
+                           (version     . ,version))
+                         results))))
+             deps)
+    results))
+
 (defun consult-cljdoc--parse-deps-edn-file (path)
   (with-temp-buffer
     (insert-file-contents path)
     (let* ((content (car (parseedn-read)))
            (deps (gethash :deps content))
-           (cands '()))
-      (maphash (lambda (k v)
-                 (let* ((parsed-art (s-split "/" (symbol-name k) t))
-                        (group-id (car parsed-art))
-                        (artifact-id (car (cdr parsed-art)))
-                        (version (gethash :mvn/version v)))
-                   (when (and group-id artifact-id version)
-                     (push `((group-id . ,group-id)
-                             (artifact-id . ,artifact-id)
-                             (version . ,version))
-                           cands))))
-               deps)
-      cands)))
+           (cands (consult-cljdoc--parse-deps-map deps))
+           (aliases (gethash :aliases content)))
+      (maphash (lambda (_k v)
+                 (let ((deps (consult-cljdoc--parse-deps-map (gethash :extra-deps v))))
+                   (seq-each (lambda (it) (push it cands)) deps)))
+               aliases)
+      (seq-uniq cands))))
 
 ;;;###autoload
 (defun consult-cljdoc-browse-project-documentation ()
@@ -133,6 +145,7 @@
                                   :category 'cljdoc-artifact
                                   :initial consult-async-default-split
                                   :require-match t
+                                  :history 'consult-cljdoc-history
                                   :lookup 'consult-cljdoc--consult-lookup))
          (uri (get-text-property 0 'uri selected)))
     (browse-url uri)))
