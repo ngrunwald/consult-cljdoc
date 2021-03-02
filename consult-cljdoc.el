@@ -6,7 +6,7 @@
 ;; Created: 2021
 ;; Version: 0.1.0
 ;; Keywords: clojure, clojurescript, cljdoc, documentation
-;; Package-Requires: ((request "20210214.37") (consult "20210301.1307"))
+;; Package-Requires: ((request "20210214.37") (consult "20210301.1307") (parseedn "20200419.1124"))
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -32,6 +32,9 @@
 (require 'request)
 (require 'consult)
 (require 'seq)
+(require 's)
+(require 'parseedn)
+(require 'subr-x)
 
 (defgroup consult-cljdoc nil
   "Easy interactive queries to cljdoc.org."
@@ -90,6 +93,35 @@
 
 (add-to-list 'marginalia-annotators-heavy
              '(cljdoc-artifact . consult-cljdoc-marginalia-annotate))
+
+(defun consult-cljdoc--parse-deps-edn-file (path)
+  (with-temp-buffer
+    (insert-file-contents path)
+    (let* ((content (car (parseedn-read)))
+           (deps (gethash :deps content))
+           (cands '()))
+      (maphash (lambda (k v)
+                 (let* ((parsed-art (s-split "/" (symbol-name k) t))
+                        (group-id (car parsed-art))
+                        (artifact-id (car (cdr parsed-art)))
+                        (version (gethash :mvn/version v)))
+                   (when (and group-id artifact-id version)
+                     (push `((group-id . ,group-id)
+                             (artifact-id . ,artifact-id)
+                             (version . ,version))
+                           cands))))
+               deps)
+      cands)))
+
+;;;###autoload
+(defun consult-cljdoc-browse-project-documentation ()
+  (interactive)
+  (let* ((path (s-concat (locate-dominating-file default-directory "deps.edn") "deps.edn"))
+         (deps (consult-cljdoc--parse-deps-edn-file path))
+         (cands (seq-map #'consult-cljdoc--parse-item deps))
+         (selected (completing-read "Artifact: " cands #'all-completions t))
+         (full (seq-find (lambda (x) (string= x selected)) cands)))
+    (browse-url (get-text-property 0 'uri full))))
 
 ;;;###autoload
 (defun consult-cljdoc ()
