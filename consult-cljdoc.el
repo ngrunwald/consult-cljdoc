@@ -36,6 +36,7 @@
 (require 'parseedn)
 (require 'subr-x)
 (require 'cl-macs)
+(require 'marginalia)
 
 (defgroup consult-cljdoc nil
   "Easy interactive queries to cljdoc.org."
