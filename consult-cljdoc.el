@@ -165,7 +165,7 @@
                                   :prompt "Artifact Name: "
                                   :sort nil
                                   :category 'cljdoc-artifact
-                                  :initial consult-async-default-split
+                                  :initial "#"
                                   :require-match t
                                   :history 'consult-cljdoc-history
                                   :lookup 'consult-cljdoc--consult-lookup))
