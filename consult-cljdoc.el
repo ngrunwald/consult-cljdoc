@@ -21,7 +21,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with request.el.
+;; along with consult-cljdoc.el.
 ;; If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
@@ -62,7 +62,7 @@
                 'version version
                 'score score
                 'description description
-                'alias alias
+                'alias (symbol-name alias)
                 'uri (format "https://cljdoc.org/d/%s/%s/%s" group-id artifact-id version))))
 
 (defun consult-cljdoc--complete-request (next query)
@@ -128,14 +128,18 @@
            (cands (consult-cljdoc--parse-deps-map deps 'main))
            (aliases (gethash :aliases content)))
       (maphash (lambda (k v)
-                 (let ((deps (consult-cljdoc--parse-deps-map (gethash :extra-deps v)
+                 (let ((deps (consult-cljdoc--parse-deps-map (or (gethash :extra-deps v)
+                                                                 (gethash :replace-deps v)
+                                                                 (make-hash-table))
                                                              (consult-cljdoc--keyword-to-symbol k))))
                    (seq-each (lambda (it) (push it cands)) deps)))
                aliases)
       (seq-uniq cands))))
 
-(defun consult-cljdoc--extract-alias (s)
-  (get-text-property 0 'alias s))
+(defun consult-cljdoc--extract-alias (cand transform)
+  (if transform
+      cand
+    (get-text-property 0 'alias cand)))
 
 ;;;###autoload
 (defun consult-cljdoc-browse-project-documentation ()
@@ -148,7 +152,7 @@
                                   :require-match t
                                   :category 'cljdoc-artifact
                                   :lookup 'consult-cljdoc--consult-lookup
-                                  :title 'consult-cljdoc--extract-alias
+                                  :group 'consult-cljdoc--extract-alias
                                   ))
          (full (seq-find (lambda (x) (string= x selected)) cands)))
     (browse-url (get-text-property 0 'uri full))))
