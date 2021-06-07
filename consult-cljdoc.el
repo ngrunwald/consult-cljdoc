@@ -51,7 +51,7 @@
         (artifact-id (cdr (assoc 'artifact-id item)))
         (version (cdr (assoc 'version item)))
         (score (cdr (assoc 'score item)))
-        (alias (cdr (assoc 'alias item)))
+        (category (cdr (assoc 'category item)))
         (description (cdr (assoc 'description item))))
     (propertize (format "%s/%s {:mvn/version \"%s\"}"
                         group-id
@@ -62,7 +62,7 @@
                 'version version
                 'score score
                 'description description
-                'alias (symbol-name alias)
+                'category category
                 'uri (format "https://cljdoc.org/d/%s/%s/%s" group-id artifact-id version))))
 
 (defun consult-cljdoc--complete-request (next query)
@@ -100,18 +100,22 @@
 (add-to-list 'marginalia-annotators-heavy
              '(cljdoc-artifact . consult-cljdoc-marginalia-annotate))
 
-(defun consult-cljdoc--parse-deps-map (deps alias)
+(defun consult-cljdoc--parse-artifact (artifact)
+  (let ((parsed (s-split "/" (symbol-name artifact) t)))
+    `(,(first parsed) ,(first (last parsed 1)))))
+
+(defun consult-cljdoc--parse-deps-map (deps category)
   (let ((results '()))
     (maphash (lambda (k v)
-               (let* ((parsed-art (s-split "/" (symbol-name k) t))
-                      (group-id (car parsed-art))
-                      (artifact-id (car (cdr parsed-art)))
+               (let* ((parsed-art (consult-cljdoc--parse-artifact k))
+                      (group-id (first parsed-art))
+                      (artifact-id (second parsed-art))
                       (version (gethash :mvn/version v)))
                  (when (and group-id artifact-id version)
                    (push `((group-id    . ,group-id)
                            (artifact-id . ,artifact-id)
                            (version     . ,version)
-                           (alias       . ,alias))
+                           (category    . ,category))
                          results))))
              deps)
     results))
@@ -125,37 +129,87 @@
     (insert-file-contents path)
     (let* ((content (car (parseedn-read)))
            (deps (gethash :deps content))
-           (cands (consult-cljdoc--parse-deps-map deps 'main))
+           (cands (consult-cljdoc--parse-deps-map deps :main))
            (aliases (gethash :aliases content)))
       (maphash (lambda (k v)
                  (let ((deps (consult-cljdoc--parse-deps-map (or (gethash :extra-deps v)
                                                                  (gethash :replace-deps v)
                                                                  (make-hash-table))
-                                                             (consult-cljdoc--keyword-to-symbol k))))
+                                                             k)))
                    (seq-each (lambda (it) (push it cands)) deps)))
                aliases)
-      (seq-uniq cands))))
+      (seq-map #'consult-cljdoc--parse-item (seq-uniq cands)))))
 
-(defun consult-cljdoc--extract-alias (cand transform)
+(defun consult-cljdoc--parse-lein-deps (category deps)
+  (seq-map
+   (lambda (dep)
+     (let* ((coord (elt dep 0))
+            (version (elt dep 1))
+            (parsed-art (consult-cljdoc--parse-artifact coord))
+            (group-id (first parsed-art))
+            (artifact-id (second parsed-art)))
+       (propertize (format "[%s \"%s\"]"
+                           (if (string-equal group-id artifact-id)
+                               group-id
+                             (format "%s/%s" group-id artifact-id))
+                           version)
+                   'group-id group-id
+                   'artifact-id artifact-id
+                   'version version
+                   'category category
+                   'uri (format "https://cljdoc.org/d/%s/%s/%s" group-id artifact-id version))))
+   deps))
+
+(defun consult-cljdoc--parse-project-clj-file (path)
+  (with-temp-buffer
+    (insert-file-contents path)
+    (let* ((content (car (parseedn-read)))
+           (raw-data (seq-drop content 3))
+           (data (make-hash-table)))
+      (seq-each
+       (lambda (pair) (puthash (first pair) (second pair) data))
+       (seq-partition raw-data 2))
+      (let* ((main-deps `(:main . ,(gethash :dependencies data)))
+             (profiles (gethash :profiles data))
+             (all-deps (list main-deps)))
+        (maphash (lambda (k v)
+                   (let ((deps (gethash :dependencies v)))
+                     (push `(,k . ,deps) all-deps)))
+                 profiles)
+        (seq-mapcat (lambda (g) (consult-cljdoc--parse-lein-deps (car g) (cdr g)))
+                    (reverse all-deps))))))
+
+(defun consult-cljdoc--extract-category (cand transform)
   (if transform
       cand
-    (get-text-property 0 'alias cand)))
+    (get-text-property 0 'category cand)))
+
+(defun consult-cljdoc--find-project-config-file ()
+  (let ((deps-dir (locate-dominating-file default-directory "deps.edn")))
+    (if deps-dir
+        `(:deps . ,(s-concat deps-dir "deps.edn"))
+      (let ((lein-dir (locate-dominating-file default-directory "project.clj")))
+        (when lein-dir
+          `(:lein . ,(s-concat deps-dir "project.clj")))))))
 
 ;;;###autoload
 (defun consult-cljdoc-browse-project-documentation ()
   (interactive)
-  (let* ((path (s-concat (locate-dominating-file default-directory "deps.edn") "deps.edn"))
-         (deps (consult-cljdoc--parse-deps-edn-file path))
-         (cands (seq-map #'consult-cljdoc--parse-item deps))
-         (selected (consult--read cands
-                                  :prompt "Artifact Name: "
-                                  :require-match t
-                                  :category 'cljdoc-artifact
-                                  :lookup 'consult-cljdoc--consult-lookup
-                                  :group 'consult-cljdoc--extract-alias
-                                  ))
-         (full (seq-find (lambda (x) (string= x selected)) cands)))
-    (browse-url (get-text-property 0 'uri full))))
+  (let* ((res (consult-cljdoc--find-project-config-file))
+         (cands (pcase (car res)
+                  (:deps (consult-cljdoc--parse-deps-edn-file (cdr res)))
+                  (:lein (consult-cljdoc--parse-project-clj-file (cdr res))))))
+    (if cands
+        (let* ((selected (consult--read cands
+                                        :prompt "Artifact Name: "
+                                        :require-match t
+                                        :category 'cljdoc-artifact
+                                        :lookup 'consult-cljdoc--consult-lookup
+                                        :group 'consult-cljdoc--extract-category
+                                        ))
+               (full (seq-find (lambda (x) (string= x selected)) cands)))
+          (browse-url (get-text-property 0 'uri full)))
+      (message "No project file found... Are you even in a clojure project, bro?"))))
 
 ;;;###autoload
 (defun consult-cljdoc ()
