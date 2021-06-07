@@ -53,10 +53,12 @@
         (score (cdr (assoc 'score item)))
         (category (cdr (assoc 'category item)))
         (description (cdr (assoc 'description item))))
-    (propertize (format "%s/%s {:mvn/version \"%s\"}"
-                        group-id
-                        artifact-id
-                        version)
+    (propertize (if (eql consult-cljdoc--deps-format :lein)
+                    (if (string-equal group-id artifact-id)
+                        (format "[%s \"%s\"]" artifact-id version)
+                      (format "[%s/%s \"%s\"]" group-id artifact-id version))
+                  (format "%s/%s {:mvn/version \"%s\"}"
+                          group-id artifact-id version))
                 'group-id group-id
                 'artifact-id artifact-id
                 'version version
@@ -119,10 +121,6 @@
                          results))))
              deps)
     results))
-
-(defun consult-cljdoc--keyword-to-symbol (keyword)
-  "Convert KEYWORD to symbol."
-  (intern (substring (symbol-name keyword) 1)))
 
 (defun consult-cljdoc--parse-deps-edn-file (path)
   (with-temp-buffer
@@ -194,6 +192,7 @@
 
 ;;;###autoload
 (defun consult-cljdoc-browse-project-documentation ()
+  "Displays the dependencies of the current Clojure project and navigates to the documentation on cljdoc.org with browse-url."
   (interactive)
   (let* ((res (consult-cljdoc--find-project-config-file))
          (cands (pcase (car res)
@@ -211,11 +210,15 @@
           (browse-url (get-text-property 0 'uri full)))
       (message "No project file found... Are you even in a clojure project, bro?"))))
 
+(defvar consult-cljdoc--deps-format nil)
+
 ;;;###autoload
 (defun consult-cljdoc ()
-  "Interactively select an artifact in cljdoc and display its documentation page in browser."
+  "Interactively select an artifact in cljdoc and display its documentation on cljdoc.org page with browse-url.
+If used from a Clojure project, it will display results in the format of the project (lein or deps)."
   (interactive)
-  (let* ((selected (consult--read (consult-cljdoc--search-generator)
+  (let* ((consult-cljdoc--deps-format (car (consult-cljdoc--find-project-config-file)))
+         (selected (consult--read (consult-cljdoc--search-generator)
                                   :prompt "Artifact Name: "
                                   :sort nil
                                   :category 'cljdoc-artifact
