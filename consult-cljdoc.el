@@ -46,6 +46,24 @@
 
 (defvar consult-cljdoc-history nil)
 
+(defun consult-cljdoc--maybe-browse-javadoc (group-id artifact-id version)
+  (request (format "https://javadoc.io/doc/%s/%s/index.html" group-id artifact-id)
+    :type "HEAD"
+    :success (cl-function
+              (lambda (&key response &allow-other-keys)
+                (if (> (length (request-response-history response)) 0)
+                    (browse-url (format "https://javadoc.io/doc/%s/%s/%s/index.html" group-id artifact-id version))
+                  (message "consult-cljdoc: Could not find artifact documentation anywhere."))))))
+
+(defun consult-cljdoc--maybe-browse-cljdoc (group-id artifact-id version)
+  (request (format "https://cljdoc.org/d/%s/%s/" group-id artifact-id)
+    :success (cl-function
+              (lambda (&key response &allow-other-keys)
+                (browse-url (format "https://cljdoc.org/d/%s/%s/%s/" group-id artifact-id version))))
+    :error (cl-function
+            (lambda (&key response &allow-other-keys)
+              (consult-cljdoc--maybe-browse-javadoc group-id artifact-id version)))))
+
 (defun consult-cljdoc--parse-item (item)
   (let ((group-id (cdr (assoc 'group-id item)))
         (artifact-id (cdr (assoc 'artifact-id item)))
@@ -207,7 +225,9 @@
                                         :group 'consult-cljdoc--extract-category
                                         ))
                (full (seq-find (lambda (x) (string= x selected)) cands)))
-          (browse-url (get-text-property 0 'uri full)))
+          (consult-cljdoc--maybe-browse-cljdoc (get-text-property 0 'group-id full)
+                                               (get-text-property 0 'artifact-id full)
+                                               (get-text-property 0 'version full)))
       (message "No project file found... Are you even in a clojure project, bro?"))))
 
 (defvar consult-cljdoc--deps-format nil)
