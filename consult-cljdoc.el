@@ -118,7 +118,7 @@
    ((get-text-property 0 'description cand))))
 
 (add-to-list 'marginalia-annotator-registry
-             '(cljdoc-artifact . consult-cljdoc-marginalia-annotate))
+             '(cljdoc-artifact consult-cljdoc-marginalia-annotate none))
 
 (defun consult-cljdoc--parse-artifact (artifact)
   (let ((parsed (s-split "/" (symbol-name artifact) t)))
