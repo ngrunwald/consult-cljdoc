@@ -117,7 +117,7 @@
   (marginalia--fields
    ((get-text-property 0 'description cand))))
 
-(add-to-list 'marginalia-annotators-heavy
+(add-to-list 'marginalia-annotator-registry
              '(cljdoc-artifact . consult-cljdoc-marginalia-annotate))
 
 (defun consult-cljdoc--parse-artifact (artifact)
