@@ -198,7 +198,7 @@
 (defun consult-cljdoc--extract-category (cand transform)
   (if transform
       cand
-    (get-text-property 0 'category cand)))
+    (symbol-name (get-text-property 0 'category cand))))
 
 (defun consult-cljdoc--find-project-config-file ()
   (let ((deps-dir (locate-dominating-file default-directory "deps.edn")))
