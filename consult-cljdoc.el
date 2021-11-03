@@ -36,11 +36,14 @@
 (require 'parseedn)
 (require 'subr-x)
 (require 'cl-macs)
+(require 'cl)
 (require 'marginalia)
 
 (defgroup consult-cljdoc nil
   "Easy interactive queries to cljdoc.org."
   :prefix "consult-cljdoc-")
+
+(defvar consult-cljdoc--deps-format nil)
 
 (defconst consult-cljdoc-version "0.1.0")
 
@@ -229,8 +232,6 @@
                                                (get-text-property 0 'artifact-id full)
                                                (get-text-property 0 'version full)))
       (message "No project file found... Are you even in a clojure project, bro?"))))
-
-(defvar consult-cljdoc--deps-format nil)
 
 ;;;###autoload
 (defun consult-cljdoc ()
