@@ -36,7 +36,6 @@
 (require 'parseedn)
 (require 'subr-x)
 (require 'cl-macs)
-(require 'cl)
 (require 'marginalia)
 
 (defgroup consult-cljdoc nil
@@ -125,14 +124,14 @@
 
 (defun consult-cljdoc--parse-artifact (artifact)
   (let ((parsed (s-split "/" (symbol-name artifact) t)))
-    `(,(first parsed) ,(first (last parsed 1)))))
+    `(,(car parsed) ,(car (last parsed 1)))))
 
 (defun consult-cljdoc--parse-deps-map (deps category)
   (let ((results '()))
     (maphash (lambda (k v)
                (let* ((parsed-art (consult-cljdoc--parse-artifact k))
-                      (group-id (first parsed-art))
-                      (artifact-id (second parsed-art))
+                      (group-id (car parsed-art))
+                      (artifact-id (cadr parsed-art))
                       (version (gethash :mvn/version v)))
                  (when (and group-id artifact-id version)
                    (push `((group-id    . ,group-id)
@@ -165,8 +164,8 @@
      (let* ((coord (elt dep 0))
             (version (elt dep 1))
             (parsed-art (consult-cljdoc--parse-artifact coord))
-            (group-id (first parsed-art))
-            (artifact-id (second parsed-art)))
+            (group-id (car parsed-art))
+            (artifact-id (cadr parsed-art)))
        (propertize (format "[%s \"%s\"]"
                            (if (string-equal group-id artifact-id)
                                group-id
@@ -186,7 +185,7 @@
            (raw-data (seq-drop content 3))
            (data (make-hash-table)))
       (seq-each
-       (lambda (pair) (puthash (first pair) (second pair) data))
+       (lambda (pair) (puthash (car pair) (cadr pair) data))
        (seq-partition raw-data 2))
       (let* ((main-deps `(:main . ,(gethash :dependencies data)))
              (profiles (gethash :profiles data))
