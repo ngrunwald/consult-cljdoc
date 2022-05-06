@@ -112,8 +112,8 @@
     (consult--async-throttle)
     (consult--async-split)))
 
-(defun consult-cljdoc--consult-lookup (_input cands cand)
-  (seq-find (lambda (x) (string= cand x)) cands))
+(defun consult-cljdoc--consult-lookup (selected cands _input _narrow)
+  (seq-find (lambda (x) (string= selected x)) cands))
 
 (defun consult-cljdoc-marginalia-annotate (cand)
   (marginalia--fields
