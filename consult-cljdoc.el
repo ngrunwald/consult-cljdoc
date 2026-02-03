@@ -107,7 +107,7 @@
 
 (defun consult-cljdoc--search-generator ()
   (thread-first (consult--async-sink)
-    (consult--async-refresh-immediate)
+    (consult--async-refresh 0)
     (consult-cljdoc--async-search)
     (consult--async-throttle)
     (consult--async-split)))
