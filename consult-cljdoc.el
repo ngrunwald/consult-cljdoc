@@ -119,7 +119,7 @@
   (marginalia--fields
    ((get-text-property 0 'description cand))))
 
-(add-to-list 'marginalia-annotator-registry
+(add-to-list 'marginalia-annotators
              '(cljdoc-artifact consult-cljdoc-marginalia-annotate none))
 
 (defun consult-cljdoc--parse-artifact (artifact)
